@@ -1,0 +1,102 @@
+name: 🔍 URL Compliance Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'URL to validate'
+        required: true
+        type: string
+      sponsor:
+        description: 'Sponsor / Partner name'
+        required: true
+        type: string
+      campaign:
+        description: 'Campaign name'
+        required: false
+        type: string
+        default: 'Not specified'
+      market:
+        description: 'Market / Region (e.g., DE, IT, US, JP)'
+        required: false
+        type: string
+        default: 'Global'
+      device:
+        description: 'Device profile'
+        required: false
+        type: choice
+        options:
+          - iphone-14
+          - iphone-se
+          - iphone-14-pro-max
+          - samsung-galaxy-s23
+          - pixel-7
+        default: 'iphone-14'
+      network:
+        description: 'Network throttling profile'
+        required: false
+        type: choice
+        options:
+          - 4g
+          - 3g
+          - wifi
+        default: '4g'
+
+jobs:
+  validate:
+    name: 🧪 Validate Sponsor URL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔨 Build TypeScript
+        run: npm run build
+
+      - name: 🔍 Run URL Validation
+        run: |
+          mkdir -p ./reports
+          node dist/cli.js \
+            --url "${{ github.event.inputs.url }}" \
+            --device "${{ github.event.inputs.device }}" > ./reports/report-${{ github.run_number }}.txt
+        env:
+          NODE_ENV: production
+
+      - name: 📊 Display Report Summary
+        if: always()
+        run: |
+          echo "========================================="
+          echo "  VALIDATION COMPLETE"
+          echo "========================================="
+          if [ -f ./reports/report-${{ github.run_number }}.txt ]; then
+            head -50 ./reports/report-${{ github.run_number }}.txt
+          else
+            echo "⚠️  No report generated"
+          fi
+
+      - name: 📎 Upload Compliance Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report-${{ github.run_number }}
+          path: ./reports/report-*.txt
+          retention-days: 90
+
+      - name: 📋 Upload All Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-reports-${{ github.run_number }}
+          path: ./reports/
+          retention-days: 90
